@@ -72,15 +72,15 @@ StreamYourMood/
 
 ## Tech Stack
 
-| Layer                | Technology                        |
-|----------------------|-----------------------------------|
-| Language             | Python 3                          |
-| Web UI               | Streamlit                         |
-| Emotion Detection    | Keras DNN + OpenCV Haar Cascade   |
-| Audio Classification | Custom CNN (mel-spectrograms)     |
-| Audio Playback       | Pygame                            |
-| Database             | SQLite3 (song cache)              |
-| Audio Features       | librosa                           |
+| Layer                | Technology                              |
+|----------------------|-----------------------------------------|
+| Language             | Python 3                                |
+| Web UI               | Streamlit                               |
+| Emotion Detection    | ONNX Runtime + OpenCV Haar Cascade      |
+| Audio Classification | ONNX Runtime (CNN on mel-spectrograms)  |
+| Audio Playback       | Browser-native (`st.audio`)             |
+| Database             | SQLite3 (song cache)                    |
+| Audio Features       | librosa                                 |
 
 ## Setup
 
@@ -147,6 +147,48 @@ Edit `globalSettings.py` to change behaviour:
 - If no songs match the detected genre, the app falls back to playing the highest-rated song in the database.
 - Emotion detection retries up to 3 times if no face is found.
 - Camera access requires a browser with permission granted (works on `localhost` without HTTPS).
+
+## TensorFlow → ONNX Runtime Migration
+
+### Why it was needed
+
+TensorFlow was the original inference engine for both the facial emotion model and the audio genre CNN. It worked locally but caused repeated failures on Streamlit Community Cloud:
+
+- `tensorflow-cpu` was removed as a standalone package in TF 2.16+ — only `tensorflow` exists now.
+- Even plain `tensorflow` returned *"No matching distribution found (from versions: none)"* on the cloud, because TensorFlow has no wheels for Python 3.13, and Streamlit Cloud's default Python had moved past 3.11/3.12.
+- Pinning `runtime.txt` / `.python-version` to Python 3.11 did not resolve it reliably.
+
+### What changed
+
+| Before | After |
+|--------|-------|
+| `tensorflow` (~500 MB install) | `onnxruntime` (~8 MB install) |
+| `facial.py` loaded `fer.h5` via Keras | `facial.py` loads `fer.onnx` via `ort.InferenceSession` |
+| `audio.py` loaded `custom_cnn_2d.h5` via Keras | `audio.py` loads `audio_cnn.onnx` via `ort.InferenceSession` |
+| Required Python 3.9–3.12 | Works on Python 3.9–3.13 |
+| `runtime.txt` / `.python-version` pins needed | No Python version constraints |
+
+### How it helps
+
+- **Deployment** — `onnxruntime` has pre-built wheels for every platform and Python version from 3.9 to 3.13. No compilation, no CUDA, no version conflicts.
+- **Speed** — ONNX Runtime's inference engine is typically faster than TF for single-sample forward passes.
+- **Size** — Removes a ~500 MB dependency. The app image on Streamlit Cloud builds in seconds instead of minutes.
+- **Portability** — `.onnx` files are a vendor-neutral format; the same files run on TF, PyTorch, Core ML, or any other ONNX-compatible runtime.
+
+### One-time model conversion (local)
+
+The pre-trained weights are stored as Keras `.h5` files. A local conversion script exports them to ONNX once — TensorFlow is only needed for this step, not for running the app.
+
+```bash
+pip install tf2onnx onnx
+python convert_models.py
+# produces: FacialEmotionRecognition/fer.onnx
+#           AudioClassification/models/audio_cnn.onnx
+```
+
+The generated `.onnx` files are committed to the repository so the deployed app never needs TensorFlow.
+
+---
 
 ## Research Paper
 

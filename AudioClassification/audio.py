@@ -1,81 +1,49 @@
+import os
 import numpy as np
-import librosa, os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-from tensorflow.keras.models import load_model
+import librosa
+import onnxruntime as ort
 
 genres = {
     'metal': 0, 'disco': 1, 'classical': 2, 'hiphop': 3, 'jazz': 4,
-    'country': 5, 'pop': 6, 'blues': 7, 'reggae': 8, 'rock': 9
+    'country': 5, 'pop': 6, 'blues': 7, 'reggae': 8, 'rock': 9,
 }
 
-base_path=os.path.dirname(os.path.realpath(__file__))
+base_path   = os.path.dirname(os.path.realpath(__file__))
+_session    = ort.InferenceSession(os.path.join(base_path, 'models/audio_cnn.onnx'))
+_input_name = _session.get_inputs()[0].name
 
-model = os.path.join(base_path,'models/custom_cnn_2d.h5')
-model = load_model(model, custom_objects=genres,compile=False)
 
 def majority_voting(scores, dict_genres):
-    preds = np.argmax(scores, axis = 1)
+    preds  = np.argmax(scores, axis=1)
     values, counts = np.unique(preds, return_counts=True)
-    counts = np.round(counts/np.sum(counts), 2)
-    votes = {k:v for k, v in zip(values, counts)}
-    votes = {k: v for k, v in sorted(votes.items(), key=lambda item: item[1], reverse=True)}
-    return [(get_genres(x, dict_genres), prob) for x, prob in votes.items()]
+    counts = np.round(counts / np.sum(counts), 2)
+    votes  = dict(sorted(zip(values, counts), key=lambda x: x[1], reverse=True))
+    return [(get_genres(k, dict_genres), v) for k, v in votes.items()]
 
 
 def get_genres(key, dict_genres):
-    # Transforming data to help on transformation
-    tmp_genre = {v:k for k,v in dict_genres.items()}
+    return {v: k for k, v in dict_genres.items()}[key]
 
-    return tmp_genre[key]
 
-"""
-@description: Method to split a song into multiple songs using overlapping windows
-"""
-def splitsongs(X, overlap = 0.5):
-    # Empty lists to hold our results
-    temp_X = []
+def splitsongs(X, overlap=0.5):
+    chunk  = 33000
+    offset = int(chunk * (1. - overlap))
+    return np.array([
+        X[i:i + chunk]
+        for i in range(0, X.shape[0] - chunk + offset, offset)
+        if X[i:i + chunk].shape[0] == chunk
+    ])
 
-    # Get the input song array size
-    xshape = X.shape[0]
-    chunk = 33000
-    offset = int(chunk*(1.-overlap))
-    
-    # Split the song and create new ones on windows
-    spsong = [X[i:i+chunk] for i in range(0, xshape - chunk + offset, offset)]
-    for s in spsong:
-        if s.shape[0] != chunk:
-            continue
 
-        temp_X.append(s)
-
-    return np.array(temp_X)
-
-"""
-@description: Method to convert a list of songs to a np array of melspectrograms
-"""
 def to_melspectrogram(songs, n_fft=1024, hop_length=256):
-    # Transformation function
-    melspec = lambda x: librosa.feature.melspectrogram(y=x, n_fft=n_fft,
-        hop_length=hop_length, n_mels=128)[:,:,np.newaxis]
+    melspec = lambda x: librosa.feature.melspectrogram(
+        y=x, n_fft=n_fft, hop_length=hop_length, n_mels=128
+    )[:, :, np.newaxis]
+    return np.array(list(map(melspec, songs)))
 
-    # map transformation of input songs to melspectrogram using log-scale
-    tsongs = map(melspec, songs)
-    # np.array([librosa.power_to_db(s, ref=np.max) for s in list(tsongs)])
-    return np.array(list(tsongs))
-
-def make_dataset_dl(song):
-    # Convert to spectrograms and split into small windows
-    signal, sr = librosa.load(song, sr=None)
-    # Convert to dataset of spectograms/melspectograms
-    signals = splitsongs(signal)
-    # Convert to "spec" representation
-    specs = to_melspectrogram(signals)
-    return specs
 
 def classify_audio(song):
-    X = make_dataset_dl(song)
-    preds = model.predict(X)
-    votes = majority_voting(preds, genres)
-    # print("{} is a {} song".format(song, votes[0][0]))
-    #print("most likely genres are: {}".format(votes[:3]))
-    return votes[:3]
+    signal, _ = librosa.load(song, sr=None)
+    specs = to_melspectrogram(splitsongs(signal)).astype(np.float32)
+    preds = _session.run(None, {_input_name: specs})[0]
+    return majority_voting(preds, genres)[:3]

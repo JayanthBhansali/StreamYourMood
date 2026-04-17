@@ -1,4 +1,4 @@
-tensorflow
+onnxruntime
 opencv-python-headless
 librosa
 numpy
