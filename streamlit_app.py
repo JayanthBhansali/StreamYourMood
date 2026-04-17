@@ -8,7 +8,7 @@ import pygame
 from mutagen.mp3 import MP3
 
 from db import create_connection
-from globalSettings import DBPath, use_webcam, save_images, emotion_genre_mappings
+from globalSettings import DBPath, save_images, emotion_genre_mappings
 from FacialEmotionRecognition import facial
 from AudioClassification import audio as audio_module
 
@@ -141,19 +141,15 @@ def page_analyzing():
     files        = st.session_state.get('files', [])
     use_existing = st.session_state.get('use_existing', False)
 
-    # ── Step 1: Get image ──
-    if use_webcam:
-        st.subheader("Capture your photo")
-        img_file = st.camera_input("Take a photo for mood detection")
-        if img_file is None:
-            st.info("Take a photo to continue.")
-            return
-        img_array = np.frombuffer(img_file.getvalue(), np.uint8)
-        frame = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-        image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    else:
-        image = cv2.imread("happy.png", 0)
-        frame = image
+    # ── Step 1: Get image via browser camera ──
+    st.subheader("📸 Capture your photo")
+    img_file = st.camera_input("Take a photo for mood detection")
+    if img_file is None:
+        st.info("Allow camera access in your browser, then take a photo to continue.")
+        return
+    img_array = np.frombuffer(img_file.getvalue(), np.uint8)
+    frame = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+    image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
     if save_images:
         createFolderIfnotExists('saved_images')
