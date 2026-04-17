@@ -29,17 +29,28 @@ StreamYourMood/
 ├── main.py                            # CLI entry point
 ├── globalSettings.py                  # Config: emotion-genre mappings, DB path
 ├── db.py                              # SQLite database initialization
-├── requirements.txt                   # Python dependencies
+├── convert_models.py                  # One-time Keras → ONNX conversion utility
+├── requirements.txt                   # Deployment dependencies
+├── packages.txt                       # System packages for Streamlit Cloud
+│
 ├── FacialEmotionRecognition/
-│   ├── facial.py                      # Face detection + emotion classification
-│   ├── fer.json                       # DNN model architecture
-│   ├── fer.h5                         # Pre-trained model weights
+│   ├── facial.py                      # Inference: face detection + emotion classification
+│   ├── train.py                       # Training: CNN on FER-2013 → exports fer.onnx
+│   ├── fer.onnx                       # Deployed model (ONNX Runtime)
+│   ├── fer.h5                         # Legacy Keras weights (kept for reference)
 │   └── haarcascade_frontalface_default.xml  # Haar Cascade face detector
+│
 ├── AudioClassification/
 │   ├── audio.py                       # Audio genre classification
 │   └── models/
-│       ├── custom_cnn_2d.h5           # CNN model for genre classification
+│       ├── audio_cnn.onnx             # Deployed CNN model (ONNX Runtime)
+│       ├── custom_cnn_2d.h5           # Legacy Keras weights (kept for reference)
 │       └── pipe_svm.joblib            # SVM pipeline model
+│
+├── dataset/                           # FER-2013 dataset (not in git — download from Kaggle)
+│   ├── train/  angry/ disgust/ fear/ happy/ neutral/ sad/ surprise/
+│   └── test/   angry/ disgust/ fear/ happy/ neutral/ sad/ surprise/
+│
 └── assets/
     ├── images/loading.gif             # Loading animation
     └── fonts/GothamLight.ttf          # Custom UI font
@@ -147,6 +158,21 @@ Edit `globalSettings.py` to change behaviour:
 - If no songs match the detected genre, the app falls back to playing the highest-rated song in the database.
 - Emotion detection retries up to 3 times if no face is found.
 - Camera access requires a browser with permission granted (works on `localhost` without HTTPS).
+
+## Dataset
+
+The facial emotion model was trained on the **FER-2013** dataset.
+
+| Detail       | Info |
+|--------------|------|
+| Source       | [Kaggle — FER-2013](https://www.kaggle.com/datasets/msambare/fer2013) |
+| Classes      | 7 emotions — Angry, Disgust, Fear, Happy, Sad, Surprise, Neutral |
+| Images       | ~35,000 grayscale 48×48 images |
+| Split        | `train/` and `test/` folders, one sub-folder per class |
+
+> The dataset folder is not included in this repository. Download it from Kaggle and place it under `FacialEmotionRecognition/data/` if you want to retrain the model.
+
+---
 
 ## TensorFlow → ONNX Runtime Migration
 

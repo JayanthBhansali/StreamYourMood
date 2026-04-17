@@ -12,9 +12,20 @@ base_path = os.path.dirname(os.path.realpath(__file__))
 
 _session    = ort.InferenceSession(os.path.join(base_path, 'fer.onnx'))
 _input_name = _session.get_inputs()[0].name
-print("Loaded FER model from disk")
+_input_shape = _session.get_inputs()[0].shape  # e.g. [None,48,48,1] or [batch,1,48,48]
 
-labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
+# Detect format: NHWC (Keras, last dim == 1) vs NCHW (PyTorch, second dim == 1)
+_is_nchw = _input_shape[-1] != 1
+
+# Label order matches model training:
+# - Keras model: trained with a fixed label list
+# - PyTorch model: ImageFolder sorts classes alphabetically
+if _is_nchw:
+    labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surprise']
+else:
+    labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
+
+print(f"Loaded FER model  |  format: {'NCHW (PyTorch)' if _is_nchw else 'NHWC (Keras)'}")
 
 
 def detect_emotion(full_size_image):
@@ -24,9 +35,16 @@ def detect_emotion(full_size_image):
     for (x, y, w, h) in faces:
         roi     = full_size_image[y:y + h, x:x + w]
         cropped = cv2.resize(roi, (48, 48)).astype(np.float32)
-        cv2.normalize(cropped, cropped, alpha=0, beta=1,
-                      norm_type=cv2.NORM_L2, dtype=cv2.CV_32F)
-        inp  = cropped.reshape(1, 48, 48, 1)
+
+        if _is_nchw:
+            # PyTorch model: pixel → [0,1] → normalise with mean=0.5 std=0.5
+            inp = ((cropped / 255.0 - 0.5) / 0.5).reshape(1, 1, 48, 48)
+        else:
+            # Keras model: L2 normalise
+            cv2.normalize(cropped, cropped, alpha=0, beta=1,
+                          norm_type=cv2.NORM_L2, dtype=cv2.CV_32F)
+            inp = cropped.reshape(1, 48, 48, 1)
+
         pred = _session.run(None, {_input_name: inp})[0]
         return labels[int(np.argmax(pred))]
 

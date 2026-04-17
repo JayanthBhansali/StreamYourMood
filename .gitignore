@@ -17,6 +17,12 @@ saved_images/
 # Sample songs (not source code)
 AudioClassification/songs/
 
+# Datasets (download separately — see README)
+dataset/
+
+# Training artefacts
+FacialEmotionRecognition/fer_best.pth
+
 # macOS
 .DS_Store
 
