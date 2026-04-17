@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.pyo
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# Runtime / generated
+audio.db
+saved_images/
+
+# Sample songs (not source code)
+AudioClassification/songs/
+
+# macOS
+.DS_Store
+
+# IDE & tools
+.vscode/
+.idea/
+.claude/
+
+# PyInstaller
+*.spec
+dist/
+build/
+
+# Logs
+*.log

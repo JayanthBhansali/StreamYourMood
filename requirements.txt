@@ -1,0 +1,8 @@
+tensorflow
+opencv-python
+librosa
+numpy
+pygame
+pyglet
+mutagen
+scikit-learn
