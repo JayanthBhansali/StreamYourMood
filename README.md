@@ -47,11 +47,28 @@ StreamYourMood/
 
 ## Model Performance
 
-| Component           | Details                                              |
-|---------------------|------------------------------------------------------|
-| Vision Pipeline     | Haar Cascades (face detection) + VGG16 (classification) |
-| Accuracy            | **83.2%** on facial emotion recognition              |
-| Inference           | Low-latency, real-time capable                       |
+### Emotion (Mood) Detection
+
+| Metric              | Details                                                   |
+|---------------------|-----------------------------------------------------------|
+| Face Detection      | Pre-trained HAAR Frontal-Face Classifier                  |
+| Classification      | Fisherface Algorithm + VGG16 (low-latency inference)      |
+| Accuracy            | **92%** (Fisherface) · **83.2%** (Haar Cascades + VGG16) |
+| Pre-processing      | Face crop + grayscale conversion                          |
+| Training Data       | 16 images per mood category, collected over 5 seconds     |
+| Evaluation          | Confusion matrix + precision                              |
+
+### Audio Classification
+
+| Metric              | Details                                                        |
+|---------------------|----------------------------------------------------------------|
+| Libraries           | PyAudio · librosa                                              |
+| Features Extracted  | **36 features** across 4 dimensions                           |
+| Feature Dimensions  | Dynamic · Harmony · Rhythm · Spectral                         |
+| Best Feature Combo  | Spectral + Dynamic + Harmony (via Feed Forward selection)      |
+| Classifier          | SVM with RBF kernel                                            |
+| Accuracy            | **81.6%**                                                      |
+| Audio File Size     | 5 MB – 10 MB · 30–60 seconds per file                        |
 
 ## Tech Stack
 
