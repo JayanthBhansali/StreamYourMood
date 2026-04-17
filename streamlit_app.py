@@ -3,9 +3,8 @@ import os
 import cv2
 import uuid
 import random
+import tempfile
 import numpy as np
-import pygame
-from mutagen.mp3 import MP3
 
 from db import create_connection
 from globalSettings import DBPath, save_images, emotion_genre_mappings
@@ -18,23 +17,6 @@ from AudioClassification import audio as audio_module
 def createFolderIfnotExists(path):
     if not os.path.exists(path):
         os.makedirs(path, mode=0o777)
-
-
-def init_pygame():
-    if not st.session_state.get('pygame_initialized'):
-        pygame.mixer.init()
-        st.session_state['pygame_initialized'] = True
-
-
-def save_folder_path(music_folder_dir):
-    conn = create_connection(DBPath)
-    c = conn.cursor()
-    c.execute("SELECT path FROM folder_paths")
-    existing = [row[0] for row in c]
-    if os.path.normpath(music_folder_dir) not in [os.path.normpath(p) for p in existing]:
-        c.execute("INSERT INTO folder_paths(path) VALUES(?)", [music_folder_dir])
-        conn.commit()
-    conn.close()
 
 
 def analyze_songs(music_folder_dir, files):
@@ -89,49 +71,29 @@ def page_home():
     st.caption("Detects your facial emotion and plays music that matches how you feel.")
     st.divider()
 
-    conn = create_connection(DBPath)
-    c = conn.cursor()
-    c.execute("SELECT path FROM folder_paths")
-    existing_paths = [row[0] for row in c]
-    conn.close()
+    uploaded_files = st.file_uploader(
+        "Upload your music files (.mp3 or .wav)",
+        type=["mp3", "wav"],
+        accept_multiple_files=True,
+    )
 
-    music_folder = st.text_input("Enter the full path of your music directory")
-
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Submit", type="primary", use_container_width=True):
-            if not music_folder:
-                st.error("Please enter a folder path.")
-            elif not os.path.isdir(music_folder):
-                st.error("Invalid folder path.")
-            else:
-                files = [f for f in os.listdir(music_folder)
-                         if f.endswith('.mp3') or f.endswith('.wav')]
-                if not files:
-                    st.error("Folder contains no .mp3 or .wav files.")
-                else:
-                    st.session_state.update({
-                        'music_folder': music_folder,
-                        'files': files,
-                        'use_existing': False,
-                        'page': 'analyzing',
-                    })
-                    st.rerun()
-
-    with col2:
-        if existing_paths and st.button("Use Existing", use_container_width=True):
+    if st.button("Submit", type="primary", use_container_width=True):
+        if not uploaded_files:
+            st.error("Please upload at least one audio file.")
+        else:
+            tmp_dir = tempfile.mkdtemp()
+            files = []
+            for uf in uploaded_files:
+                dest = os.path.join(tmp_dir, uf.name)
+                with open(dest, "wb") as f:
+                    f.write(uf.getbuffer())
+                files.append(uf.name)
             st.session_state.update({
-                'music_folder': '',
-                'files': [],
-                'use_existing': True,
+                'music_folder': tmp_dir,
+                'files': files,
                 'page': 'analyzing',
             })
             st.rerun()
-
-    if existing_paths:
-        st.subheader("Saved Paths")
-        for i, path in enumerate(existing_paths, 1):
-            st.text(f"{i}  →  {path}")
 
 
 def page_analyzing():
@@ -139,7 +101,6 @@ def page_analyzing():
 
     music_folder = st.session_state.get('music_folder', '')
     files        = st.session_state.get('files', [])
-    use_existing = st.session_state.get('use_existing', False)
 
     # ── Step 1: Get image via browser camera ──
     st.subheader("📸 Capture your photo")
@@ -173,10 +134,9 @@ def page_analyzing():
     st.success(f"Emotion detected: **{detected_emotion}**")
 
     # ── Step 3: Analyze songs ──
-    if not use_existing and files:
+    if files:
         with st.spinner(f"Classifying {len(files)} song(s) — this may take a moment..."):
             analyze_songs(music_folder, files)
-            save_folder_path(music_folder)
 
     # ── Step 4: Match songs to emotion ──
     with st.spinner("Matching songs to your mood..."):
@@ -194,36 +154,16 @@ def page_analyzing():
         'genre_to_play':    genre_to_play,
         'song_paths':       song_paths,
         'current_song':     random.choice(song_paths),
-        'song_loaded':      False,
-        'is_playing':       False,
-        'is_paused':        False,
         'page':             'player',
     })
     st.rerun()
 
 
 def page_player():
-    init_pygame()
-
     song_paths   = st.session_state.get('song_paths', [])
     current_song = st.session_state.get('current_song', '')
     emotion      = st.session_state.get('detected_emotion', '')
     genre        = st.session_state.get('genre_to_play', '')
-    is_playing   = st.session_state.get('is_playing', False)
-    is_paused    = st.session_state.get('is_paused', False)
-
-    # Auto-play on first arrival at player
-    if not st.session_state.get('song_loaded') and current_song:
-        pygame.mixer.music.load(current_song)
-        pygame.mixer.music.play()
-        st.session_state['song_loaded'] = True
-        st.session_state['is_playing']  = True
-        is_playing = True
-
-    # Detect if song finished naturally
-    if is_playing and not is_paused and not pygame.mixer.music.get_busy():
-        st.session_state['is_playing'] = False
-        is_playing = False
 
     st.title("🎵 Stream Your Mood")
 
@@ -234,54 +174,24 @@ def page_player():
     st.divider()
 
     song_name = os.path.basename(current_song) if current_song else "—"
-    if is_playing and not is_paused:
-        status_label = "▶  Playing"
-    elif is_paused:
-        status_label = "⏸  Paused"
-    else:
-        status_label = "⏹  Stopped"
-
-    st.subheader(status_label)
+    st.subheader("▶  Now Playing")
     st.write(f"**{song_name}**")
 
+    if current_song:
+        st.audio(current_song, autoplay=True)
+
     # ── Controls ──
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2 = st.columns(2)
 
     with c1:
-        pause_label = "⏸  Pause" if (is_playing and not is_paused) else "▶  Resume"
-        if st.button(pause_label, use_container_width=True):
-            if is_paused:
-                pygame.mixer.music.unpause()
-                st.session_state['is_paused'] = False
-            else:
-                pygame.mixer.music.pause()
-                st.session_state['is_paused'] = True
+        if st.button("⏭  Next", use_container_width=True):
+            st.session_state['current_song'] = random.choice(song_paths)
             st.rerun()
 
     with c2:
-        if st.button("⏭  Next", use_container_width=True):
-            next_song = random.choice(song_paths)
-            pygame.mixer.music.load(next_song)
-            pygame.mixer.music.play()
-            st.session_state.update({
-                'current_song': next_song,
-                'is_playing':   True,
-                'is_paused':    False,
-            })
-            st.rerun()
-
-    with c3:
-        if st.button("⏹  Stop", use_container_width=True):
-            pygame.mixer.music.stop()
-            st.session_state.update({'is_playing': False, 'is_paused': False})
-            st.rerun()
-
-    with c4:
         if st.button("🔄  Restart", use_container_width=True):
-            pygame.mixer.music.stop()
-            for key in ['music_folder', 'files', 'use_existing', 'detected_emotion',
-                        'genre_to_play', 'song_paths', 'current_song',
-                        'song_loaded', 'is_playing', 'is_paused']:
+            for key in ['music_folder', 'files', 'detected_emotion',
+                        'genre_to_play', 'song_paths', 'current_song']:
                 st.session_state.pop(key, None)
             st.session_state['page'] = 'home'
             st.rerun()
@@ -294,13 +204,7 @@ def page_player():
         is_current = (path == current_song)
         label      = f"▶  {name}" if is_current else f"　{name}"
         if st.button(label, key=f"track_{i}", use_container_width=True):
-            pygame.mixer.music.load(path)
-            pygame.mixer.music.play()
-            st.session_state.update({
-                'current_song': path,
-                'is_playing':   True,
-                'is_paused':    False,
-            })
+            st.session_state['current_song'] = path
             st.rerun()
 
 
