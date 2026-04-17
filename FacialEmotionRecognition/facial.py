@@ -2,30 +2,69 @@
 import os, sys
 from pathlib import Path
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-from keras.models import model_from_json, load_model
 import numpy as np
 import cv2
+from tensorflow import keras
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
-#print("str(Path(__file__).resolve().parents[1]) : ", str(Path(__file__).resolve().parents[1]))
 from globalSettings import *
 
-base_path=os.path.dirname(os.path.realpath(__file__))
-#sys.path.append(base_path)
+base_path = os.path.dirname(os.path.realpath(__file__))
 
-#loading VGG model
+
+def _build_fer_model():
+    """Rebuild the FER architecture with original Keras 2 layer names so that
+    weights can be loaded by name from the legacy fer.h5 file."""
+    return keras.Sequential([
+        keras.layers.Input(shape=(48, 48, 1)),
+        keras.layers.Conv2D(64, (3, 3), activation='relu',
+                            kernel_regularizer=keras.regularizers.L2(0.01),
+                            name='conv2d_1'),
+        keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same',  name='conv2d_2'),
+        keras.layers.BatchNormalization(momentum=0.99, epsilon=0.001,        name='batch_normalization_1'),
+        keras.layers.MaxPooling2D((2, 2),                                    name='max_pooling2d_1'),
+        keras.layers.Dropout(0.5,                                            name='dropout_1'),
+
+        keras.layers.Conv2D(128, (3, 3), activation='relu', padding='same', name='conv2d_3'),
+        keras.layers.BatchNormalization(momentum=0.99, epsilon=0.001,        name='batch_normalization_2'),
+        keras.layers.Conv2D(128, (3, 3), activation='relu', padding='same', name='conv2d_4'),
+        keras.layers.BatchNormalization(momentum=0.99, epsilon=0.001,        name='batch_normalization_3'),
+        keras.layers.MaxPooling2D((2, 2),                                    name='max_pooling2d_2'),
+        keras.layers.Dropout(0.5,                                            name='dropout_2'),
+
+        keras.layers.Conv2D(256, (3, 3), activation='relu', padding='same', name='conv2d_5'),
+        keras.layers.BatchNormalization(momentum=0.99, epsilon=0.001,        name='batch_normalization_4'),
+        keras.layers.Conv2D(256, (3, 3), activation='relu', padding='same', name='conv2d_6'),
+        keras.layers.BatchNormalization(momentum=0.99, epsilon=0.001,        name='batch_normalization_5'),
+        keras.layers.MaxPooling2D((2, 2),                                    name='max_pooling2d_3'),
+        keras.layers.Dropout(0.5,                                            name='dropout_3'),
+
+        keras.layers.Conv2D(512, (3, 3), activation='relu', padding='same', name='conv2d_7'),
+        keras.layers.BatchNormalization(momentum=0.99, epsilon=0.001,        name='batch_normalization_6'),
+        keras.layers.Conv2D(512, (3, 3), activation='relu', padding='same', name='conv2d_8'),
+        keras.layers.BatchNormalization(momentum=0.99, epsilon=0.001,        name='batch_normalization_7'),
+        keras.layers.MaxPooling2D((2, 2),                                    name='max_pooling2d_4'),
+        keras.layers.Dropout(0.5,                                            name='dropout_4'),
+
+        keras.layers.Flatten(name='flatten_1'),
+        keras.layers.Dense(512, activation='relu',    name='dense_1'),
+        keras.layers.Dropout(0.4,                     name='dropout_5'),
+        keras.layers.Dense(256, activation='relu',    name='dense_2'),
+        keras.layers.Dropout(0.4,                     name='dropout_6'),
+        keras.layers.Dense(128, activation='relu',    name='dense_3'),
+        keras.layers.Dropout(0.5,                     name='dropout_7'),
+        keras.layers.Dense(7,   activation='softmax', name='dense_4'),
+    ], name='sequential_1')
+
+
 if useVGG:
     IMG_SIZE = 48
-    model = load_model(os.path.join(base_path,"VGG16.hdf5"))
+    model = keras.models.load_model(os.path.join(base_path, "VGG16.hdf5"))
 else:
-    #loading the model
-    with open(os.path.join(base_path,'fer.json'), 'r') as json_file:
-        loaded_model_json = json_file.read()
-    loaded_model = model_from_json(loaded_model_json)
-    # load weights into new model
-    loaded_model.load_weights(os.path.join(base_path,"fer.h5"))
+    loaded_model = _build_fer_model()
+    loaded_model.load_weights(os.path.join(base_path, "fer.h5"), by_name=True)
 
 print("Loaded model from disk")
 
