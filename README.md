@@ -45,6 +45,14 @@ StreamYourMood/
     └── fonts/GothamLight.ttf          # Custom UI font
 ```
 
+## Model Performance
+
+| Component           | Details                                              |
+|---------------------|------------------------------------------------------|
+| Vision Pipeline     | Haar Cascades (face detection) + VGG16 (classification) |
+| Accuracy            | **83.2%** on facial emotion recognition              |
+| Inference           | Low-latency, real-time capable                       |
+
 ## Tech Stack
 
 | Layer                | Technology                        |
