@@ -113,3 +113,13 @@ Edit `globalSettings.py` to change behaviour:
 - Songs are analyzed and cached in `audio.db` on first run — subsequent runs are faster.
 - If no songs match the detected genre, the app falls back to playing the highest-rated song in the database.
 - Emotion detection retries up to 3 times if no face is found.
+
+## Research Paper
+
+This project is based on the following published paper:
+
+**[Music Recommendation Based on Facial Expression](https://www.ijltemas.in/DigitalLibrary/Vol.9Issue11/18-23.pdf)**
+Mrudula K, Harsh R Jain, Amogha R Chandra, Jayanth Bhansali
+*International Journal of Latest Technology in Engineering, Management & Applied Science (IJLTEMAS)*
+Vol. IX, Issue XI, pp. 18–23, December 2020
+B.N.M Institute of Technology, Bangalore
