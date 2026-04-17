@@ -1,4 +1,4 @@
-tensorflow-cpu
+tensorflow
 opencv-python-headless
 librosa
 numpy
