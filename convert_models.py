@@ -4,7 +4,7 @@ One-time conversion script — run locally (TensorFlow must be installed).
     python convert_models.py
 
 Converts Keras .h5 models to ONNX format so the app can run without TensorFlow.
-Output files are committed to the repo and loaded by onnxruntime at runtime.
+Uses from_function (concrete function) to work with Keras 3.x / TF 2.16+.
 """
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -59,8 +59,9 @@ def convert_fer():
 
     model.load_weights('FacialEmotionRecognition/fer.h5', by_name=True)
 
-    input_sig = [tf.TensorSpec([None, 48, 48, 1], tf.float32, name='input')]
-    proto, _ = tf2onnx.convert.from_keras(model, input_signature=input_sig, opset=13)
+    spec = tf.TensorSpec([None, 48, 48, 1], tf.float32)
+    func = tf.function(lambda x: model(x, training=False))
+    proto, _ = tf2onnx.convert.from_function(func, input_signature=[spec], opset=13)
 
     out = 'FacialEmotionRecognition/fer.onnx'
     onnx.save(proto, out)
@@ -82,14 +83,12 @@ def convert_audio():
         custom_objects=genres,
         compile=False,
     )
-    print("\nAudio CNN architecture:")
-    model.summary()
+    input_shape = model.input_shape[1:]
+    print(f"\nAudio CNN input shape: {input_shape}")
 
-    input_shape = list(model.input_shape[1:])
-    print(f"\nInput shape (excluding batch): {input_shape}")
-
-    input_sig = [tf.TensorSpec([None] + input_shape, tf.float32, name='input')]
-    proto, _ = tf2onnx.convert.from_keras(model, input_signature=input_sig, opset=13)
+    spec = tf.TensorSpec([None] + list(input_shape), tf.float32)
+    func = tf.function(lambda x: model(x, training=False))
+    proto, _ = tf2onnx.convert.from_function(func, input_signature=[spec], opset=13)
 
     out = 'AudioClassification/models/audio_cnn.onnx'
     onnx.save(proto, out)
