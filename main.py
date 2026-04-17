@@ -1,11 +1,9 @@
 import os
-from contextlib import contextmanager
 from globalSettings import *
 import uuid
 from db import *
 import sys, cv2
 from sys import exit
-import sqlite3
 import traceback
 import random
 import time
@@ -26,16 +24,6 @@ def createFolderIfnotExists(path):
     if not os.path.exists(path):
         os.makedirs(path, mode=0o777)
 
-@contextmanager
-def suppress_stdout():
-    with open(os.devnull, "w") as devnull:
-        old_stdout = sys.stdout
-        sys.stdout = devnull
-        try:  
-            yield
-        finally:
-            sys.stdout = old_stdout
-
 print("\n<============= LOADING LIBRARIES =============>\n")
 
 #with suppress_stdout():
@@ -43,30 +31,29 @@ from FacialEmotionRecognition import facial
 from AudioClassification import audio
 
 print("\n<============= LIBRARIES LOADED =============>\n")
-flag = True
+
 def main_func():
 
     conn = create_connection(DBPath)
     c=conn.cursor()
 
-    if flag:
-        while True:
-            music_folder_dir = input("Enter the full path of music directory : ")
-            if os.path.isdir(music_folder_dir):
-                break
-            else:
-                print("\nPlease enter a valid folder!\n")
-                time.sleep(2)
+    while True:
+        music_folder_dir = input("Enter the full path of music directory : ")
+        if os.path.isdir(music_folder_dir):
+            break
+        else:
+            print("\nPlease enter a valid folder!\n")
+            time.sleep(2)
 
-        files = [f for f in os.listdir(music_folder_dir) if f.endswith('.mp3') or f.endswith('.wav')]
-        if not files:
-            raise NameError("\n The folder doesn't contain any audio files")
-            # sys.exit()
+    files = [f for f in os.listdir(music_folder_dir) if f.endswith('.mp3') or f.endswith('.wav')]
+    if not files:
+        raise NameError("\n The folder doesn't contain any audio files")
 
     print("\n<============= ANALYZING MOOD =============>\n")
     if use_webcam:
         video_capture = cv2.VideoCapture(0)
         frame = video_capture.read()[1]
+        video_capture.release()
         image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY )
     else:
         image = cv2.imread("happy.png",0)
@@ -137,6 +124,8 @@ def main_func():
             if os.path.isfile(path):
                 i=1
                 song_paths.append(path)
+
+    conn.close()
 
     if i==0 and not song_paths:
         print("No songs in the DB.")

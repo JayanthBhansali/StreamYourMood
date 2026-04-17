@@ -1,15 +1,10 @@
 # load json and create model
-from __future__ import division
-
 import os, sys
 from pathlib import Path
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 
-from keras.models import Sequential
-from keras.layers import Dense
 from keras.models import model_from_json, load_model
-import numpy
 import numpy as np
 import cv2
 
@@ -21,26 +16,19 @@ base_path=os.path.dirname(os.path.realpath(__file__))
 #sys.path.append(base_path)
 
 #loading VGG model
-#if useVGG:
-if False: #false because vgg is removed
+if useVGG:
     IMG_SIZE = 48
     model = load_model(os.path.join(base_path,"VGG16.hdf5"))
 else:
     #loading the model
-    json_file = open(os.path.join(base_path,'fer.json'), 'r')
-    loaded_model_json = json_file.read()
-    json_file.close()
+    with open(os.path.join(base_path,'fer.json'), 'r') as json_file:
+        loaded_model_json = json_file.read()
     loaded_model = model_from_json(loaded_model_json)
     # load weights into new model
     loaded_model.load_weights(os.path.join(base_path,"fer.h5"))
 
 print("Loaded model from disk")
 
-#setting image resizing parameters
-WIDTH = 48
-HEIGHT = 48
-x=None
-y=None
 labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
 
 #loading image

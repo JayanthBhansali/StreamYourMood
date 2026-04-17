@@ -20,9 +20,6 @@ def create_table(conn, create_table_sql):
         c.execute(create_table_sql)
     except Exception as e:
         print(e)
-    
-    finally:
-        conn.close()
 
 create_table_sql = '''
 CREATE TABLE IF NOT EXISTS `songs` (
@@ -42,5 +39,7 @@ CREATE TABLE IF NOT EXISTS `folder_paths` (
 
 conn = create_connection(dbName)
 create_table(conn, create_table_sql)
+conn.close()
 conn = create_connection(dbName)
 create_table(conn, create_table_sql2)
+conn.close()

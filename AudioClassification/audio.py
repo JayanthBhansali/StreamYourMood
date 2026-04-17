@@ -1,16 +1,14 @@
 import numpy as np
 import librosa, os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from tensorflow.keras.models import load_model
 
 genres = {
-    'metal': 0, 'disco': 1, 'classical': 2, 'hiphop': 3, 'jazz': 4, 
+    'metal': 0, 'disco': 1, 'classical': 2, 'hiphop': 3, 'jazz': 4,
     'country': 5, 'pop': 6, 'blues': 7, 'reggae': 8, 'rock': 9
 }
-#song = 'songs/test.mp3'
 
 base_path=os.path.dirname(os.path.realpath(__file__))
-#sys.path.append(base_path)
 
 model = os.path.join(base_path,'models/custom_cnn_2d.h5')
 model = load_model(model, custom_objects=genres,compile=False)
@@ -57,7 +55,7 @@ def splitsongs(X, overlap = 0.5):
 """
 def to_melspectrogram(songs, n_fft=1024, hop_length=256):
     # Transformation function
-    melspec = lambda x: librosa.feature.melspectrogram(x, n_fft=n_fft,
+    melspec = lambda x: librosa.feature.melspectrogram(y=x, n_fft=n_fft,
         hop_length=hop_length, n_mels=128)[:,:,np.newaxis]
 
     # map transformation of input songs to melspectrogram using log-scale
@@ -75,7 +73,6 @@ def make_dataset_dl(song):
     return specs
 
 def classify_audio(song):
-    global model
     X = make_dataset_dl(song)
     preds = model.predict(X)
     votes = majority_voting(preds, genres)

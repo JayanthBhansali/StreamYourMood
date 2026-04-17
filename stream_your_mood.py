@@ -13,43 +13,22 @@ except:
     import pyglet
 pyglet.font.add_file('assets/fonts/GothamLight.ttf')
 from threading import Thread
-from contextlib import contextmanager
 from globalSettings import *
 import uuid
 import cv2
 from sys import exit
-import sqlite3
 import random
-from tkinter import *
 global_pid = os.getpid()
 import signal
-
-try:
-    import pygame
-except:
-    os.system('pip install pygame')
-    import pygame
 
 def createFolderIfnotExists(path):
     if not os.path.exists(path):
         os.makedirs(path, mode=0o777)
 
-@contextmanager
-def suppress_stdout():
-    with open(os.devnull, "w") as devnull:
-        old_stdout = sys.stdout
-        sys.stdout = devnull
-        try:  
-            yield
-        finally:
-            sys.stdout = old_stdout
+default_font = "Gotham"
 
-default_font = "Gotham" #"times new roman"
-
-grey = "#888" #"grey"
-white = "#ffffff" #"white"
+white = "#ffffff"
 black = "#000"
-gold = "gold"
 default_bg = black
 default_fg = "#00d7df"
 
@@ -151,6 +130,7 @@ def analyze_facial_emotion(root,flag, music_folder_dir, files):
         if use_webcam:
             video_capture = cv2.VideoCapture(0)
             frame = video_capture.read()[1]
+            video_capture.release()
             image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY )
         else:
             image = cv2.imread("happy.png",0)
@@ -204,6 +184,7 @@ def submit(root, flag, music_folder_dir, existing_paths, name_var):
         if os.path.isdir(music_folder_dir):
             files = [f for f in os.listdir(music_folder_dir) if f.endswith('.mp3') or f.endswith('.wav')]
             if not files:
+                conn.close()
                 messagebox.showerror("showerror","The folder doesn't contain any audio files")
             else:
                 if os.path.normpath(music_folder_dir) not in list(os.path.normpath(p) for p in existing_paths):
@@ -213,7 +194,7 @@ def submit(root, flag, music_folder_dir, existing_paths, name_var):
                 loading_window(root, flag, music_folder_dir, files)
             
         else:
-            #print("\nPlease enter a valid folder!\n")
+            conn.close()
             messagebox.showerror("showerror", "Please enter a valid folder!")
     else:
         conn.close()
@@ -244,12 +225,12 @@ class FolderPath:
         existingPaths = []
         query="select id,path from folder_paths"
         c.execute(query)
-        conn.commit()
         btnState="disabled"
         existing_count=False
         for col in c:
             btnState,existing_count="normal",True
             existingPaths.append(col[1])
+        conn.close()
 
         # creating a button using the widget
         # Button that will call the submit function
@@ -346,19 +327,17 @@ class MusicPlayer:
         i+=1
         track = os.path.basename(track)
         self.playlist.insert(END,track)
-            
 
-        def go(event):
-            cs = self.playlist.curselection()
-            text=self.playlist.get(cs)
-            print(playlist_mappings[cs[0]])
-            song_path = playlist_mappings[cs[0]]
-            if os.path.isfile(song_path):
-                self.playsong(song_path)
-            else:
-                messagebox.showerror("showerror", "Invalid song!")
+    def go(event):
+        cs = self.playlist.curselection()
+        print(playlist_mappings[cs[0]])
+        song_path = playlist_mappings[cs[0]]
+        if os.path.isfile(song_path):
+            self.playsong(song_path)
+        else:
+            messagebox.showerror("showerror", "Invalid song!")
 
-        self.playlist.bind('<Double-1>', go)
+    self.playlist.bind('<Double-1>', go)
 
   # Defining Play Song Function
   def playsong(self, path):
